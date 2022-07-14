@@ -10,9 +10,9 @@ export interface IStaticRouterConfig
     GzipSuffix?: Array<string>
 }
 
-interface fileList
+interface files
 {
-    [key: string]: Promise<string | Buffer>,
+    [key: string]: string | Buffer,
 }
 interface fields
 {
@@ -21,7 +21,7 @@ interface fields
 
 export interface UploadResquest extends Request
 {
-    files?: fileList,
+    files?: files,
     fields?: fields;
 }
 
@@ -31,7 +31,7 @@ export interface FileSystemConfig
     MaxLiseners: number
 }
 
-export async function StaticRouter(staticDir: string, config: IStaticRouterConfig, filesysConfig: FileSystemConfig)
+export function StaticRouter(staticDir: string, config: IStaticRouterConfig, filesysConfig: FileSystemConfig)
 {
     const router = express.Router();
     const fileRequester = new fs.FileRequester(filesysConfig.MaxLiseners, filesysConfig.EnableLog, 32);
@@ -78,7 +78,7 @@ export async function StaticRouter(staticDir: string, config: IStaticRouterConfi
     return router;
 }
 
-export async function UploadRouter(cachePath?: string)
+export function UploadRouter(cachePath?: string)
 {
     const router = express.Router();
 
@@ -88,45 +88,44 @@ export async function UploadRouter(cachePath?: string)
         bb.on('file', (fileName, fileStream, info) =>
         {
             info.filename = Buffer.from(info.filename, 'ascii').toString('utf-8');
-            if (!req.files)
-                req.files = {};
-            req.files[info.filename] = new Promise<string | Buffer>((resolve, reject) =>
-            {
-                if (cachePath) {
-                    const path = cachePath + '/' + crypto.randomUUID() + '.' + info.filename;
-                    fs.open(path, 'w').then((file) =>
-                    {
-                        fileStream.on('data', (data: Buffer) =>
-                        {
-                            file.write(data);
-                        });
-                        fileStream.on('end', async () =>
-                        {
-                            await file.close();
-                            resolve(path);
-                        }).on('error', async error =>
-                        {
-                            await file.close();
-                            reject(error);
-                        });
-                    });
-                }
-                else {
-                    let buf = Buffer.from([]);
+
+            if (cachePath) {
+                const path = cachePath + '/' + crypto.randomUUID() + '.' + info.filename;
+                fs.open(path, 'w').then((file) =>
+                {
                     fileStream.on('data', (data: Buffer) =>
                     {
-                        buf = Buffer.concat([buf, data]);
-                    }).on('end', () =>
-                    {
-                        resolve(buf);
-                    }).on('error', error =>
-                    {
-                        reject(error);
+                        file.write(data);
                     });
+                    fileStream.on('end', async () =>
+                    {
+                        if (!req.files)
+                            req.files = {};
+                        req.files[info.filename] = path;
+                        await file.close();
+                    }).on('error', async error =>
+                    {
+                        console.warn(error);
+                        await file.close();
+                    });
+                });
+            }
+            else {
+                let buf = Buffer.from([]);
+                fileStream.on('data', (data: Buffer) =>
+                {
+                    buf = Buffer.concat([buf, data]);
+                }).on('end', () =>
+                {
+                    if (!req.files)
+                        req.files = {};
+                    req.files[info.filename] = buf;
+                }).on('error', error =>
+                {
+                    console.warn(error);
+                });
 
-                }
-            });
-
+            }
         });
         bb.on('field', (fieldName, value) =>
         {
@@ -142,7 +141,6 @@ export async function UploadRouter(cachePath?: string)
         req.pipe(bb);
 
     });
-
 
     return router;
 }

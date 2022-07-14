@@ -56,7 +56,7 @@ fs.readFile('./ServerConfig.json').then(async (data) =>
     app.use(express.urlencoded({ extended: false }));
 
 
-    app.use('/api/test', await UploadRouter(config.CacheDir));
+    app.use('/api/test', UploadRouter(config.CacheDir));
     app.post('/api/test', async (req: UploadResquest, res) =>
     {
         console.log(req.files, req.fields);
@@ -64,8 +64,8 @@ fs.readFile('./ServerConfig.json').then(async (data) =>
         res.end();
     });
 
-    app.use(await StaticRouter(config.StaticDir, config.RouterConfig.StaticRouterConfig, config.FileSystemConfig));
-    app.use(await StaticRouter(config.DataDir, config.RouterConfig.StaticRouterConfig, config.FileSystemConfig));
+    app.use(StaticRouter(config.StaticDir, config.RouterConfig.StaticRouterConfig, config.FileSystemConfig));
+    app.use(StaticRouter(config.DataDir, config.RouterConfig.StaticRouterConfig, config.FileSystemConfig));
 
     const server = app.listen(config.Port, () =>
     {
